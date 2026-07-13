@@ -431,7 +431,9 @@ class TapPostgres(SQLTap):
             sqlalchemy_url=url.render_as_string(hide_password=False),
         )
 
-    def guess_key_type(self, key_data: str) -> paramiko.PKey:
+    def guess_key_type(
+        self, key_data: str, password: str | None = None,
+    ) -> paramiko.PKey:
         """Guess the type of the private key.
 
         We are duplicating some logic from the ssh_tunnel package here,
@@ -439,6 +441,7 @@ class TapPostgres(SQLTap):
 
         Args:
             key_data: The private key data to guess the type of.
+            password: The password to decrypt the private key, if any.
 
         Returns:
             The private key object.
@@ -452,7 +455,9 @@ class TapPostgres(SQLTap):
             paramiko.Ed25519Key,
         ):
             try:
-                key = key_class.from_private_key(io.StringIO(key_data))
+                key = key_class.from_private_key(
+                    io.StringIO(key_data), password=password,
+                )
             except paramiko.SSHException:  # noqa: PERF203
                 continue
             else:
@@ -474,7 +479,10 @@ class TapPostgres(SQLTap):
         self.ssh_tunnel: SSHTunnelForwarder = SSHTunnelForwarder(
             ssh_address_or_host=(ssh_config["host"], ssh_config["port"]),
             ssh_username=ssh_config["username"],
-            ssh_private_key=self.guess_key_type(ssh_config["private_key"]),
+            ssh_private_key=self.guess_key_type(
+                ssh_config["private_key"],
+                password=ssh_config.get("private_key_password"),
+            ),
             ssh_private_key_password=ssh_config.get("private_key_password"),
             remote_bind_address=(url.host, url.port),
         )
